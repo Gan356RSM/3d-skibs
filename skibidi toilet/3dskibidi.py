@@ -28,14 +28,14 @@ class Game(ShowBase):
         base.win.requestProperties(wp)
         base.setBackgroundColor(0.7, 0.8, 1)
 
-
+        self.all_blocks = []
         self.texture = loader.loadTexture('block.png')
 
         base.cTrav = CollisionTraverser()
         pusher = CollisionHandlerPusher()
 
         base.disableMouse()
-        self.player = self.add_block((0, 0, 0), (0., 0., 0., 0.), False)
+        self.player = self.add_block((0, 0, 0), (0., 0., 0., 0.), False, True)
         base.camera.reparentTo(self.player)
         base.camera.setPos((0, 0, 0))
 
@@ -49,24 +49,26 @@ class Game(ShowBase):
 
         self.blocks = {} 
 
+        self.blocks_in_pos = {}
+        
         width, elevation_map = load_level("map.txt")
-        width = 32
+        width = 30
         count = 0    
 
         for c in elevation_map:
             if c.isdigit():
                 x = count // width
                 y = count % width
+                self.blocks_in_pos[(x, y)] = []
                 if c == '0':
-                    self.add_block((x, y, int(c) - 1), (0.2, 0.3, 0.7, 1.0), False)
+                    b = self.add_block((x, y, int(c) - 1), (0.2, 0.3, 0.7, 1.0), False, False)
+                    self.blocks_in_pos[(x, y)].append(b)
                 else:
                     for i in range(-1, int(c)):
-                        b = self.add_block((x, y, i), (0.1, 0.5, 0.1, 1.0), True)
+                        b = self.add_block((x, y, i), (0.1, 0.5, 0.1, 1.0), True, False)
+                        self.blocks_in_pos[(x, y)].append(b)
                 self.blocks[(x, y)] = int(c)
                 count += 1
-
-
-
 
         self.keymap = {
             "forward": False,
@@ -76,7 +78,8 @@ class Game(ShowBase):
             "turn_left": False,
             "turn_right": False,
             "jump": False,
-            "place_block":False
+            "place_block":False,
+            "delete_block":False
         }
 
         base.accept('w', self.update_keymap, ["forward", True])
@@ -93,6 +96,7 @@ class Game(ShowBase):
         base.accept('e-up', self.update_keymap, ["turn_right", False])
         base.accept('space', self.jump)
         base.accept('r', self.add_block_in_front)
+        base.accept('f', self.delete_one_block)
 
         taskMgr.add(self.update_game, "update")
         self.velocity = 0
@@ -134,8 +138,8 @@ class Game(ShowBase):
     
     def add_block_in_front(self):
         rad = math.radians(base.camera.getH())
-        x = int(self.player.getX() - math.sin(rad) * 1)
-        y = int(self.player.getY() + math.cos(rad) * 1)
+        x = int(self.player.getX() - math.sin(rad) * 2)
+        y = int(self.player.getY() + math.cos(rad) * 2)
         
         if not (x,y) in self.blocks:
             height = -1
@@ -146,7 +150,7 @@ class Game(ShowBase):
         
         if height <= 5:
             
-            self.add_block((x, y, height), (0.1 ,0.5, 0.1, 1.0), True)
+            self.add_block((x, y, height), (0.1 ,0.5, 0.1, 1.0), True, False)
         
     
     def jump(self):
@@ -168,8 +172,8 @@ class Game(ShowBase):
         y = self.player.getY()
         z = self.player.getZ()
         rad = math.radians(base.camera.getH())
-        dx = -math.sin(rad) * 0.1
-        dy = math.cos(rad) * 0.1
+        dx = -math.sin(rad) * 0.2
+        dy = math.cos(rad) * 0.2
         self.player.setPos((x + dx, y + dy, z))
         
     def move_backward(self):
@@ -177,8 +181,8 @@ class Game(ShowBase):
         y = self.player.getY()
         z = self.player.getZ()
         rad = math.radians(base.camera.getH())
-        dx = math.sin(rad) * 0.1
-        dy = -math.cos(rad) * 0.1
+        dx = math.sin(rad) * 0.2
+        dy = -math.cos(rad) * 0.2
         self.player.setPos((x + dx, y + dy, z))
         
     def move_left(self):
@@ -208,7 +212,7 @@ class Game(ShowBase):
         base.camera.setH(h - 1)
         
 
-    def add_block(self, pos, color, add_collider):
+    def add_block(self, pos, color, add_collider, is_player):
         block = loader.loadModel('block')
         block.setTexture(self.texture)
         block.setPos(pos)
@@ -219,9 +223,24 @@ class Game(ShowBase):
             cnode = CollisionNode("test")
             cnode.addSolid(CollisionBox((0, 0, 0), 1., 1., 1.))
             collider = block.attachNewNode(cnode)
+        
+        if not is_player:
+            self.all_blocks.append(block)
 
         return block
-
+    
+    def delete_one_block(self):
+        rad = math.radians(base.camera.getH())
+        x = int(self.player.getX() - math.sin(rad) * 2)
+        y = int(self.player.getY() + math.cos(rad) * 2)
+        if len(self.all_blocks) == 0:
+            return
+        
+        blocks = self.blocks_in_pos[(x, y)]
+            
+        b = self.all_blocks.pop(len(blocks) - 1)
+        b.detachNode()
 
 game = Game()
 game.run()
+
